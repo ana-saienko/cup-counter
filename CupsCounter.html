@@ -1,0 +1,277 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Visual Novels Cup Timer</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 600px;
+      margin: 2em auto;
+      padding: 1em;
+      background: #f9f9f9;
+    }
+    .subtitle {
+      font-size: 1.3em;
+      font-weight: bold;
+      margin-top: 1em;
+      margin-bottom: 0.5em;
+    }
+    .form-label {
+      display: block;
+      margin: 0.5em 0 0.2em;
+    }
+    .form-input, .form-select {
+      padding: 0.4em;
+      width: 100%;
+      box-sizing: border-box;
+    }
+    .inline-group {
+      display: flex;
+      gap: 10px;
+    }
+    .inline-group input {
+      flex: 1;
+    }
+    .form-button {
+      margin-top: 1em;
+      padding: 0.6em 1.2em;
+      background-color: #007BFF;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+    .form-button:hover {
+      background-color: #0056b3;
+    }
+    .results {
+      margin-top: 2em;
+      background: #fff;
+      padding: 1em;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      white-space: pre-wrap;
+    }
+  </style>
+</head>
+<body>
+  <h2 class="subtitle" id="title">Visual Novels Cup Timer</h2>
+
+  <label class="form-label" id="languageLabel" for="languageSelect">Choose language / Выберите язык:</label>
+  <select class="form-select" id="languageSelect">
+    <option value="en">English</option>
+    <option value="ru">Русский</option>
+  </select>
+
+  <label class="form-label" id="includeFirstLabel" for="includeFirstEpisode">Include first free episode?</label>
+  <select class="form-select" id="includeFirstEpisode">
+    <option value="yes">Yes</option>
+    <option value="no" selected>No</option>
+  </select>
+
+  <label class="form-label" id="currentCupsLabel" for="currentCups">Current number of cups:</label>
+  <input class="form-input" type="number" id="currentCups" min="0" max="10" value="2" />
+
+  <div class="inline-group">
+    <div style="flex: 1;">
+      <label class="form-label" id="nextCupHoursLabel" for="nextCupHours">Time until next cup (hours):</label>
+      <input class="form-input" type="number" id="nextCupHours" min="0" max="10" value="0" />
+    </div>
+    <div style="flex: 1;">
+      <label class="form-label" id="nextCupMinutesLabel" for="nextCupMinutes">Time until next cup (minutes):</label>
+      <input class="form-input" type="number" id="nextCupMinutes" min="0" max="59" value="0" />
+    </div>
+  </div>
+
+  <label class="form-label" id="episodesToReadLabel" for="episodesToRead">Number of episodes to read:</label>
+  <input class="form-input" type="number" id="episodesToRead" min="1" max="100" value="12" />
+
+  <button class="form-button" id="calculateBtn">Calculate</button>
+
+  <div id="results" class="results">
+    <p id="doneBy"></p>
+    <p id="countdown"></p>
+    <p id="cupSchedule"></p>
+  </div>
+
+  <script>
+    const texts = {
+      en: {
+        title: "Visual Novels Cup Timer",
+        languageLabel: "Choose language / Выберите язык:",
+        includeFirstLabel: "Include first free episode?",
+        includeFirstOptions: { yes: "Yes", no: "No" },
+        currentCupsLabel: "Current number of cups:",
+        nextCupHoursLabel: "Time until next cup (hours):",
+        nextCupMinutesLabel: "Time until next cup (minutes):",
+        episodesToReadLabel: "Number of episodes to read:",
+        calculateBtn: "Calculate",
+        doneByPrefix: "You will be done by: ",
+        countdownPrefix: "⏳ Time remaining: ",
+        hours: "hours",
+        minutes: "minutes",
+        cupScheduleTitle: "Cup schedule:",
+        startWithCups: "You start with",
+        cupsSufficient: "No waiting needed, cups are sufficient.",
+        nextCupAppears: "Next cup appears in",
+        cupAt: "Cup",
+        invalidEpisodes: "Number of episodes must be at least 1.",
+        invalidCups: "Number of cups cannot be negative.",
+        invalidNextCupTime: "Invalid time for next cup.",
+      },
+      ru: {
+        title: "Таймер для Visual Novels",
+        languageLabel: "Выберите язык / Choose language:",
+        includeFirstLabel: "Включить первый бесплатный эпизод?",
+        includeFirstOptions: { yes: "Да", no: "Нет" },
+        currentCupsLabel: "Текущее количество кубков:",
+        nextCupHoursLabel: "Время до следующего кубка (часы):",
+        nextCupMinutesLabel: "Время до следующего кубка (минуты):",
+        episodesToReadLabel: "Количество эпизодов для чтения:",
+        calculateBtn: "Рассчитать",
+        doneByPrefix: "Вы закончите к: ",
+        countdownPrefix: "⏳ Осталось времени: ",
+        hours: "часов",
+        minutes: "минут",
+        cupScheduleTitle: "Расписание кубков:",
+        startWithCups: "У вас есть кубков:",
+        cupsSufficient: "Ожидание не требуется, кубков достаточно.",
+        nextCupAppears: "Следующий кубок появится через",
+        cupAt: "Кубок",
+        invalidEpisodes: "Количество эпизодов должно быть не менее 1.",
+        invalidCups: "Количество кубков не может быть отрицательным.",
+        invalidNextCupTime: "Неверное время для следующего кубка.",
+      }
+    };
+
+    const langSelect = document.getElementById('languageSelect');
+    const includeFirstEpisode = document.getElementById('includeFirstEpisode');
+    const currentCupsInput = document.getElementById('currentCups');
+    const nextCupHoursInput = document.getElementById('nextCupHours');
+    const nextCupMinutesInput = document.getElementById('nextCupMinutes');
+    const episodesToReadInput = document.getElementById('episodesToRead');
+    const calculateBtn = document.getElementById('calculateBtn');
+    const doneByP = document.getElementById('doneBy');
+    const countdownP = document.getElementById('countdown');
+    const cupScheduleP = document.getElementById('cupSchedule');
+
+    const titleH2 = document.getElementById('title');
+    const languageLabel = document.getElementById('languageLabel');
+    const includeFirstLabel = document.getElementById('includeFirstLabel');
+    const currentCupsLabel = document.getElementById('currentCupsLabel');
+    const nextCupHoursLabel = document.getElementById('nextCupHoursLabel');
+    const nextCupMinutesLabel = document.getElementById('nextCupMinutesLabel');
+    const episodesToReadLabel = document.getElementById('episodesToReadLabel');
+
+    let countdownInterval;
+
+    function updateLanguage() {
+      const lang = langSelect.value;
+      const t = texts[lang];
+
+      titleH2.textContent = t.title;
+      languageLabel.textContent = t.languageLabel;
+      includeFirstLabel.textContent = t.includeFirstLabel;
+      currentCupsLabel.textContent = t.currentCupsLabel;
+      nextCupHoursLabel.textContent = t.nextCupHoursLabel;
+      nextCupMinutesLabel.textContent = t.nextCupMinutesLabel;
+      episodesToReadLabel.textContent = t.episodesToReadLabel;
+      calculateBtn.textContent = t.calculateBtn;
+
+      includeFirstEpisode.options[0].text = t.includeFirstOptions.yes;
+      includeFirstEpisode.options[1].text = t.includeFirstOptions.no;
+    }
+
+    function calculate() {
+      clearInterval(countdownInterval);
+      const lang = langSelect.value;
+      const t = texts[lang];
+
+      const includeFirst = includeFirstEpisode.value === 'yes';
+      let cups = Number(currentCupsInput.value);
+      const nextCupHours = Number(nextCupHoursInput.value);
+      const nextCupMinutes = Number(nextCupMinutesInput.value);
+      let episodes = Number(episodesToReadInput.value);
+
+      if (episodes < 1) return alert(t.invalidEpisodes);
+      if (cups < 0) return alert(t.invalidCups);
+      if (nextCupHours < 0 || nextCupMinutes < 0 || nextCupMinutes > 59)
+        return alert(t.invalidNextCupTime);
+
+      if (includeFirst) episodes -= 1;
+
+      const cupIntervalMinutes = 180;
+      const now = new Date();
+
+      const cupsNeeded = episodes;
+      let cupsToWaitFor = cupsNeeded - cups;
+      if (cupsToWaitFor < 0) cupsToWaitFor = 0;
+
+      let totalWaitingMinutes = 0;
+      if (cupsToWaitFor > 0) {
+        totalWaitingMinutes =
+          nextCupHours * 60 + nextCupMinutes + (cupsToWaitFor - 1) * cupIntervalMinutes;
+      }
+
+      const doneDate = new Date(now.getTime() + totalWaitingMinutes * 60 * 1000);
+
+      doneByP.textContent =
+        t.doneByPrefix +
+        doneDate.toLocaleString(undefined, {
+          year: "numeric",
+          month: "long",
+          day: "numeric",
+          hour: "2-digit",
+          minute: "2-digit",
+        });
+
+      function updateCountdown() {
+        const diff = doneDate - new Date();
+        if (diff <= 0) {
+          countdownP.textContent = `${t.countdownPrefix} 0 ${t.hours} 0 ${t.minutes}`;
+          clearInterval(countdownInterval);
+          return;
+        }
+        const hours = Math.floor(diff / (1000 * 60 * 60));
+        const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+        countdownP.textContent = `${t.countdownPrefix} ${hours} ${t.hours} ${minutes} ${t.minutes}`;
+      }
+
+      updateCountdown();
+      countdownInterval = setInterval(updateCountdown, 60 * 1000);
+
+      let scheduleText = `${t.cupScheduleTitle}\n- ${t.startWithCups} ${cups}.\n`;
+      if (cupsToWaitFor === 0) {
+        scheduleText += `- ${t.cupsSufficient}\n`;
+      } else {
+        scheduleText += `- ${t.nextCupAppears} ${nextCupHours} ${t.hours} ${nextCupMinutes} ${t.minutes} (cup #${cups + 1}): ${new Date(now.getTime() + (nextCupHours * 60 + nextCupMinutes) * 60 * 1000).toLocaleString()}\n`;
+        for (let i = 2; i <= cupsToWaitFor; i++) {
+          const cupTime = new Date(
+            now.getTime() +
+              (nextCupHours * 60 +
+                nextCupMinutes +
+                (i - 1) * cupIntervalMinutes) *
+                60 *
+                1000
+          );
+          scheduleText += `- ${t.cupAt} #${cups + i}: ${cupTime.toLocaleString()}\n`;
+        }
+      }
+
+      cupScheduleP.textContent = scheduleText;
+    }
+
+    langSelect.addEventListener("change", () => {
+      updateLanguage();
+      calculate();
+    });
+
+    calculateBtn.addEventListener("click", calculate);
+
+    updateLanguage();
+    calculate();
+  </script>
+</body>
+</html>
